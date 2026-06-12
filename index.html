@@ -655,6 +655,14 @@
         }
     }
 
+    function deleteGame(id) {
+        if (confirm('Delete this game?')) {
+            games = games.filter(g => g.id !== id);
+            saveData();
+            render();
+        }
+    }
+
     function getGameTotals(gameHands) {
         const totals = {};
 
@@ -835,6 +843,7 @@
                         </div>
                     </div>
                     <div class="game-scores">${scoresHtml}</div>
+                    <button class="btn-danger" onclick="deleteGame(${game.id})" style="margin-top: 12px;">Delete Game</button>
                 </div>
             `;
         });
