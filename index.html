@@ -440,6 +440,12 @@
                 <input type="checkbox" id="knockerGin">
                 <span class="checkbox-label">Knocker ginned</span>
             </label>
+
+            <label class="checkbox-item hidden" id="bigGinLabel">
+                <input type="checkbox" id="bigGin">
+                <span class="checkbox-label">Big Gin bonus — 30 points</span>
+            </label>
+
             <label class="checkbox-item" id="knockerWonLabel">
                 <input type="checkbox" id="knockerWon" checked>
                 <span class="checkbox-label">Knocker won hand</span>
@@ -482,6 +488,7 @@
 
         <div class="rules-list hidden" id="rulesList">
             <p><strong>Gin:</strong> Meld all cards → opponent's deadwood + 25 bonus.</p>
+            <p><strong>Big Gin:</strong> Draw into gin with no discard → opponent's deadwood + 30 bonus.</p>
             <p><strong>Knock:</strong> Go out with 10 or fewer deadwood → difference in deadwood.</p>
             <p><strong>Undercut:</strong> Opponent has lower/equal deadwood → difference + 10 bonus.</p>
             <p><strong>Game:</strong> This tracker auto-completes when someone reaches 100.</p>
@@ -506,7 +513,6 @@
 
     let isSyncing = false;
 
-    // Initialize user ID from localStorage or fetch from server
     async function initializeUserId() {
         let storedUserId = localStorage.getItem('ginRummyUserId');
         if (storedUserId) {
@@ -525,7 +531,6 @@
         }
     }
 
-    // Load data from server
     async function loadDataFromServer() {
         try {
             const response = await fetch(`${API_URL}/data`, {
@@ -544,7 +549,6 @@
         return false;
     }
 
-    // Save data to server
     async function saveDataToServer() {
         if (isSyncing) return;
 
@@ -574,7 +578,6 @@
     }
 
     function saveData() {
-        // Save to server asynchronously without blocking UI
         saveDataToServer();
     }
 
@@ -606,6 +609,7 @@
         const knockerDW = parseInt(document.getElementById('knockerDeadwood').value) || 0;
         const opponentDW = parseInt(document.getElementById('opponentDeadwood').value) || 0;
         const isGin = document.getElementById('knockerGin').checked;
+        const isBigGin = document.getElementById('bigGin').checked;
         const knockerWon = document.getElementById('knockerWon').checked;
 
         let knockerScore = 0;
@@ -613,8 +617,9 @@
         let notes = [];
 
         if (isGin) {
-            knockerScore = opponentDW + 25;
-            notes.push(`Gin: ${opponentDW} deadwood + 25 bonus`);
+            const ginBonus = isBigGin ? 30 : 25;
+            knockerScore = opponentDW + ginBonus;
+            notes.push(`${isBigGin ? 'Big Gin' : 'Gin'}: ${opponentDW} deadwood + ${ginBonus} bonus`);
         } else if (knockerWon) {
             const diff = opponentDW - knockerDW;
 
@@ -645,6 +650,7 @@
             knockerDeadwood: parseInt(document.getElementById('knockerDeadwood').value) || 0,
             opponentDeadwood: parseInt(document.getElementById('opponentDeadwood').value) || 0,
             knockerGin: document.getElementById('knockerGin').checked,
+            bigGin: document.getElementById('bigGin').checked,
             knockerWon: document.getElementById('knockerWon').checked,
             knockerScore,
             opponentScore,
@@ -656,7 +662,10 @@
         document.getElementById('knockerDeadwood').value = '0';
         document.getElementById('opponentDeadwood').value = '0';
         document.getElementById('knockerGin').checked = false;
+        document.getElementById('bigGin').checked = false;
+        document.getElementById('bigGinLabel').classList.add('hidden');
         document.getElementById('knockerWon').checked = true;
+        document.getElementById('knockerWonLabel').classList.remove('hidden');
 
         saveData();
 
@@ -929,7 +938,13 @@
 
         document.getElementById('knockerGin').onchange = function() {
             document.getElementById('knockerWonLabel').classList.toggle('hidden', this.checked);
-            if (this.checked) document.getElementById('knockerWon').checked = true;
+            document.getElementById('bigGinLabel').classList.toggle('hidden', !this.checked);
+
+            if (this.checked) {
+                document.getElementById('knockerWon').checked = true;
+            } else {
+                document.getElementById('bigGin').checked = false;
+            }
         };
 
         renderStats();
@@ -961,7 +976,6 @@
         });
     }
 
-    // Initialize app with server sync
     async function initializeApp() {
         await initializeUserId();
         await loadDataFromServer();
