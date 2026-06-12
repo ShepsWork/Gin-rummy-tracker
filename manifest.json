@@ -1,7 +1,7 @@
 {
   "name": "Gin Rummy Score Tracker",
   "short_name": "Gin Rummy",
-  "description": "A local gin rummy score tracker that saves games on this device.",
+  "description": "A gin rummy score tracker that saves games on the server.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
