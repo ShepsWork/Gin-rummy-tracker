@@ -78,7 +78,7 @@
         .knocker .player-label { color: #1e40af; }
         .opponent .player-label { color: #4b5563; }
 
-        input[type="text"], input[type="number"], input[type="checkbox"] {
+        input[type="text"], input[type="number"], input[type="file"] {
             font-family: inherit;
             font-size: inherit;
         }
@@ -107,36 +107,80 @@
             margin: 8px 0;
         }
 
-        .checkbox-group {
-            background-color: #f9fafb;
-            padding: 14px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-            margin: 14px 0;
+        .section-label {
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: #4b5563;
+            margin: 14px 0 8px;
         }
 
-        .checkbox-item {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 12px;
-            cursor: pointer;
-            align-items: flex-start;
+        .score-method-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 14px;
         }
 
-        .checkbox-item:last-child { margin-bottom: 0; }
-
-        input[type="checkbox"] {
-            width: 17px;
-            height: 17px;
-            cursor: pointer;
-            margin-top: 2px;
-        }
-
-        .checkbox-label {
+        .score-method-btn {
+            border: 2px solid #d1d5db;
+            background: #ffffff;
+            color: #374151;
+            border-radius: 10px;
+            padding: 12px 10px;
+            font-weight: 800;
             font-size: 14px;
-            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .score-method-btn span {
+            display: block;
+            font-size: 12px;
+            color: #6b7280;
+            font-weight: 600;
+            margin-top: 3px;
+        }
+
+        .score-method-btn.active {
+            background: #2563eb;
+            border-color: #1d4ed8;
+            color: white;
+        }
+
+        .score-method-btn.active span { color: #dbeafe; }
+
+        .quick-points {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .quick-point-btn {
+            border: 1px solid #d1d5db;
+            background: #ffffff;
+            border-radius: 7px;
+            padding: 8px 0;
+            font-weight: 800;
+            cursor: pointer;
             color: #374151;
         }
+
+        .quick-point-btn:active, .score-method-btn:active, .btn:active { transform: scale(0.98); }
+
+        .live-preview {
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 12px;
+            margin: 14px 0;
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        .live-preview strong { color: #1f2937; }
 
         .btn {
             padding: 12px 16px;
@@ -161,6 +205,13 @@
             width: 100%;
             padding: 8px 0;
             text-align: center;
+            cursor: pointer;
+        }
+
+        .btn-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
         }
 
         .score-display {
@@ -199,6 +250,44 @@
             background: #2563eb;
             width: 0%;
         }
+
+        .sticky-score {
+            position: sticky;
+            top: calc(8px + env(safe-area-inset-top));
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 10px;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.14);
+        }
+
+        .sticky-score-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: 900;
+            color: #2563eb;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .sticky-score-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .sticky-player {
+            background: #eff6ff;
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .sticky-name { font-size: 12px; color: #4b5563; font-weight: 700; }
+        .sticky-value { font-size: 24px; color: #1d4ed8; font-weight: 900; }
 
         .game-over-box {
             background: #f0fdf4;
@@ -357,9 +446,7 @@
             padding: 0;
         }
 
-        .rules-card {
-            border-left: 4px solid #2563eb;
-        }
+        .rules-card { border-left: 4px solid #2563eb; }
 
         .rules-toggle {
             width: 100%;
@@ -375,14 +462,19 @@
             color: #1f2937;
         }
 
-        .rules-list {
-            margin-top: 14px;
-        }
+        .rules-list { margin-top: 14px; }
 
         .rules-list p {
             color: #374151;
             font-size: 14px;
             margin-bottom: 8px;
+        }
+
+        .settings-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
         }
 
         .small-note {
@@ -393,6 +485,13 @@
         }
 
         .hidden { display: none; }
+
+        @media (max-width: 420px) {
+            .header h1 { font-size: 26px; }
+            .score-method-grid { grid-template-columns: 1fr; }
+            .quick-points { grid-template-columns: repeat(4, 1fr); }
+            .settings-actions { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 
@@ -406,6 +505,11 @@
 
     <div class="stats-card hidden" id="statsCard">
         <div class="stats-grid" id="statsGrid"></div>
+    </div>
+
+    <div class="sticky-score hidden" id="stickyScoreCard">
+        <div class="sticky-score-title">Current Score</div>
+        <div class="sticky-score-grid" id="stickyScoreGrid"></div>
     </div>
 
     <div class="card">
@@ -424,33 +528,40 @@
 
         <button class="swap-btn" onclick="swapPlayers()">⇄ Swap Players</button>
 
+        <div class="section-label">Scoring Type</div>
+        <div class="score-method-grid" id="scoreMethodGrid">
+            <button type="button" class="score-method-btn active" data-method="knock" onclick="setScoringMethod('knock')">
+                Knock
+                <span>Difference only</span>
+            </button>
+            <button type="button" class="score-method-btn" data-method="gin" onclick="setScoringMethod('gin')">
+                Gin
+                <span>Deadwood + 25</span>
+            </button>
+            <button type="button" class="score-method-btn" data-method="bigGin" onclick="setScoringMethod('bigGin')">
+                Big Gin
+                <span>Deadwood + 30</span>
+            </button>
+            <button type="button" class="score-method-btn" data-method="undercut" onclick="setScoringMethod('undercut')">
+                Undercut
+                <span>Difference + 10</span>
+            </button>
+        </div>
+
         <div class="grid-2">
             <div class="player-section knocker">
-                <div class="player-label">Deadwood Points</div>
-                <input type="number" id="knockerDeadwood" value="0" min="0">
+                <div class="player-label">Knocker Deadwood</div>
+                <input type="number" id="knockerDeadwood" value="0" min="0" inputmode="numeric">
+                <div class="quick-points" data-target="knockerDeadwood"></div>
             </div>
             <div class="player-section opponent">
-                <div class="player-label">Deadwood Points</div>
-                <input type="number" id="opponentDeadwood" value="0" min="0">
+                <div class="player-label">Opponent Deadwood</div>
+                <input type="number" id="opponentDeadwood" value="0" min="0" inputmode="numeric">
+                <div class="quick-points" data-target="opponentDeadwood"></div>
             </div>
         </div>
 
-        <div class="checkbox-group">
-            <label class="checkbox-item">
-                <input type="checkbox" id="knockerGin">
-                <span class="checkbox-label">Knocker ginned</span>
-            </label>
-
-            <label class="checkbox-item hidden" id="bigGinLabel">
-                <input type="checkbox" id="bigGin">
-                <span class="checkbox-label">Big Gin bonus — 30 points</span>
-            </label>
-
-            <label class="checkbox-item" id="knockerWonLabel">
-                <input type="checkbox" id="knockerWon" checked>
-                <span class="checkbox-label">Knocker won hand</span>
-            </label>
-        </div>
+        <div class="live-preview" id="scorePreview"></div>
 
         <button class="btn btn-primary" onclick="addHand()">+ Add Hand</button>
     </div>
@@ -465,7 +576,10 @@
 
         <div class="score-display" id="scoreDisplay"></div>
 
-        <button class="btn btn-warning hidden" id="undoBtn" onclick="undoLastHand()">← Undo Last Hand</button>
+        <div class="btn-row">
+            <button class="btn btn-warning hidden" id="undoBtn" onclick="undoLastHand()">← Undo</button>
+            <button class="btn btn-secondary hidden" id="editLastBtn" onclick="editLastHand()">✎ Edit Last</button>
+        </div>
 
         <div id="handsList" style="margin-top: 14px;"></div>
 
@@ -487,11 +601,27 @@
         </button>
 
         <div class="rules-list hidden" id="rulesList">
+            <p><strong>Knock:</strong> Go out with 10 or fewer deadwood → score the difference in deadwood.</p>
             <p><strong>Gin:</strong> Meld all cards → opponent's deadwood + 25 bonus.</p>
             <p><strong>Big Gin:</strong> Draw into gin with no discard → opponent's deadwood + 30 bonus.</p>
-            <p><strong>Knock:</strong> Go out with 10 or fewer deadwood → difference in deadwood.</p>
             <p><strong>Undercut:</strong> Opponent has lower/equal deadwood → difference + 10 bonus.</p>
             <p><strong>Game:</strong> This tracker auto-completes when someone reaches 100.</p>
+        </div>
+    </div>
+
+    <div class="card rules-card">
+        <button class="rules-toggle" onclick="toggleSettings()">
+            <span>⚙️ Backup / Restore</span>
+            <span id="settingsArrow">▶</span>
+        </button>
+
+        <div class="rules-list hidden" id="settingsList">
+            <p>Export a backup before big updates, or restore from a previous backup file.</p>
+            <div class="settings-actions">
+                <button class="btn btn-secondary" onclick="exportBackup()">Download Backup</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('restoreFile').click()">Restore Backup</button>
+            </div>
+            <input class="hidden" type="file" id="restoreFile" accept="application/json,.json" onchange="restoreBackup(event)">
         </div>
     </div>
 
@@ -505,6 +635,7 @@
     let games = [];
     let currentGame = [];
     let userId = null;
+    let scoringMethod = 'knock';
 
     let playerNames = {
         knocker: 'Player 1',
@@ -538,8 +669,8 @@
             });
             if (response.ok) {
                 const data = await response.json();
-                games = data.games || [];
-                currentGame = data.currentGame || [];
+                games = Array.isArray(data.games) ? data.games : [];
+                currentGame = Array.isArray(data.currentGame) ? data.currentGame : [];
                 playerNames = data.playerNames || { knocker: 'Player 1', opponent: 'Player 2' };
                 return true;
             }
@@ -550,7 +681,7 @@
     }
 
     async function saveDataToServer() {
-        if (isSyncing) return;
+        if (isSyncing || !userId) return;
 
         isSyncing = true;
         try {
@@ -584,6 +715,7 @@
     function savePlayerNames() {
         playerNames.knocker = document.getElementById('knockerName').value || 'Player 1';
         playerNames.opponent = document.getElementById('opponentName').value || 'Player 2';
+        updatePreview();
         saveData();
     }
 
@@ -602,56 +734,109 @@
         [knockerDW.value, opponentDW.value] = [opponentDW.value, knockerDW.value];
 
         loadPlayerNamesToInputs();
+        updatePreview();
         saveData();
     }
 
+    function setScoringMethod(method) {
+        scoringMethod = method;
+
+        document.querySelectorAll('.score-method-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.method === method);
+        });
+
+        if (method === 'gin' || method === 'bigGin') {
+            document.getElementById('knockerDeadwood').value = '0';
+        }
+
+        updatePreview();
+    }
+
+    function makeQuickPointButtons() {
+        const values = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15];
+
+        document.querySelectorAll('.quick-points').forEach(group => {
+            const targetId = group.dataset.target;
+            group.innerHTML = values.map(value => `
+                <button type="button" class="quick-point-btn" onclick="setDeadwood('${targetId}', ${value})">${value}</button>
+            `).join('');
+        });
+    }
+
+    function setDeadwood(targetId, value) {
+        document.getElementById(targetId).value = value;
+        updatePreview();
+    }
+
+    function getInputValues() {
+        return {
+            knockerDW: parseInt(document.getElementById('knockerDeadwood').value, 10) || 0,
+            opponentDW: parseInt(document.getElementById('opponentDeadwood').value, 10) || 0
+        };
+    }
+
     function calculateScore() {
-        const knockerDW = parseInt(document.getElementById('knockerDeadwood').value) || 0;
-        const opponentDW = parseInt(document.getElementById('opponentDeadwood').value) || 0;
-        const isGin = document.getElementById('knockerGin').checked;
-        const isBigGin = document.getElementById('bigGin').checked;
-        const knockerWon = document.getElementById('knockerWon').checked;
+        const { knockerDW, opponentDW } = getInputValues();
 
         let knockerScore = 0;
         let opponentScore = 0;
         let notes = [];
+        let scoringType = scoringMethod;
 
-        if (isGin) {
-            const ginBonus = isBigGin ? 30 : 25;
-            knockerScore = opponentDW + ginBonus;
-            notes.push(`${isBigGin ? 'Big Gin' : 'Gin'}: ${opponentDW} deadwood + ${ginBonus} bonus`);
-        } else if (knockerWon) {
+        if (scoringMethod === 'gin') {
+            knockerScore = opponentDW + 25;
+            notes.push(`Gin: ${opponentDW} deadwood + 25 bonus`);
+        } else if (scoringMethod === 'bigGin') {
+            knockerScore = opponentDW + 30;
+            notes.push(`Big Gin: ${opponentDW} deadwood + 30 bonus`);
+        } else if (scoringMethod === 'undercut') {
+            const diff = Math.max(knockerDW - opponentDW, 0);
+            opponentScore = diff + 10;
+            notes.push(`Undercut: ${diff} difference + 10 bonus`);
+        } else {
             const diff = opponentDW - knockerDW;
 
             if (diff > 0) {
                 knockerScore = diff;
                 notes.push(`Knock: ${opponentDW} - ${knockerDW} = ${diff}`);
             } else {
-                notes.push(`Knock scored no points`);
+                notes.push('Knock scored no points');
             }
-        } else {
-            const diff = Math.max(knockerDW - opponentDW, 0);
-            opponentScore = diff + 10;
-            notes.push(`Undercut: ${diff} difference + 10 bonus`);
         }
 
-        return { knockerScore, opponentScore, notes };
+        return { knockerScore, opponentScore, notes, scoringType };
+    }
+
+    function updatePreview() {
+        const preview = document.getElementById('scorePreview');
+        if (!preview) return;
+
+        const { knockerScore, opponentScore, notes } = calculateScore();
+        const winnerText = knockerScore > 0
+            ? `<strong>${playerNames.knocker}</strong> scores <strong>${knockerScore}</strong> point${knockerScore === 1 ? '' : 's'}.`
+            : opponentScore > 0
+                ? `<strong>${playerNames.opponent}</strong> scores <strong>${opponentScore}</strong> point${opponentScore === 1 ? '' : 's'}.`
+                : 'No points will be scored for this hand.';
+
+        preview.innerHTML = `${winnerText}<br>${notes.join('<br>')}`;
     }
 
     function addHand() {
         savePlayerNames();
 
-        const { knockerScore, opponentScore, notes } = calculateScore();
+        const { knockerDW, opponentDW } = getInputValues();
+        const { knockerScore, opponentScore, notes, scoringType } = calculateScore();
 
         const hand = {
             id: Date.now(),
             knockerName: playerNames.knocker,
             opponentName: playerNames.opponent,
-            knockerDeadwood: parseInt(document.getElementById('knockerDeadwood').value) || 0,
-            opponentDeadwood: parseInt(document.getElementById('opponentDeadwood').value) || 0,
-            knockerGin: document.getElementById('knockerGin').checked,
-            bigGin: document.getElementById('bigGin').checked,
-            knockerWon: document.getElementById('knockerWon').checked,
+            knockerDeadwood: knockerDW,
+            opponentDeadwood: opponentDW,
+            scoringType,
+            knockerGin: scoringType === 'gin' || scoringType === 'bigGin',
+            bigGin: scoringType === 'bigGin',
+            knockerWon: scoringType !== 'undercut',
             knockerScore,
             opponentScore,
             notes
@@ -661,11 +846,7 @@
 
         document.getElementById('knockerDeadwood').value = '0';
         document.getElementById('opponentDeadwood').value = '0';
-        document.getElementById('knockerGin').checked = false;
-        document.getElementById('bigGin').checked = false;
-        document.getElementById('bigGinLabel').classList.add('hidden');
-        document.getElementById('knockerWon').checked = true;
-        document.getElementById('knockerWonLabel').classList.remove('hidden');
+        setScoringMethod('knock');
 
         saveData();
 
@@ -683,6 +864,27 @@
     function undoLastHand() {
         if (currentGame.length === 0) return;
         currentGame.pop();
+        saveData();
+        render();
+    }
+
+    function editLastHand() {
+        if (currentGame.length === 0) return;
+
+        const hand = currentGame.pop();
+        playerNames.knocker = hand.knockerName;
+        playerNames.opponent = hand.opponentName;
+        loadPlayerNamesToInputs();
+
+        document.getElementById('knockerDeadwood').value = hand.knockerDeadwood || 0;
+        document.getElementById('opponentDeadwood').value = hand.opponentDeadwood || 0;
+
+        let method = hand.scoringType || 'knock';
+        if (!hand.scoringType) {
+            method = hand.bigGin ? 'bigGin' : hand.knockerGin ? 'gin' : hand.knockerWon === false ? 'undercut' : 'knock';
+        }
+        setScoringMethod(method);
+
         saveData();
         render();
     }
@@ -746,8 +948,8 @@
         const totals = {};
 
         gameHands.forEach(hand => {
-            totals[hand.knockerName] = (totals[hand.knockerName] || 0) + hand.knockerScore;
-            totals[hand.opponentName] = (totals[hand.opponentName] || 0) + hand.opponentScore;
+            totals[hand.knockerName] = (totals[hand.knockerName] || 0) + (hand.knockerScore || 0);
+            totals[hand.opponentName] = (totals[hand.opponentName] || 0) + (hand.opponentScore || 0);
         });
 
         if (Object.keys(totals).length === 0) {
@@ -820,14 +1022,32 @@
         statsCard.classList.remove('hidden');
     }
 
+    function renderStickyScore() {
+        const stickyScoreCard = document.getElementById('stickyScoreCard');
+        const stickyScoreGrid = document.getElementById('stickyScoreGrid');
+
+        stickyScoreCard.classList.toggle('hidden', currentGame.length === 0);
+        if (currentGame.length === 0) return;
+
+        const totals = getGameTotals(currentGame);
+        stickyScoreGrid.innerHTML = Object.entries(totals).map(([player, score]) => `
+            <div class="sticky-player">
+                <div class="sticky-name">${player}</div>
+                <div class="sticky-value">${score}</div>
+            </div>
+        `).join('');
+    }
+
     function renderCurrentGame() {
         const currentGameCard = document.getElementById('currentGameCard');
         const scoreDisplay = document.getElementById('scoreDisplay');
         const handsList = document.getElementById('handsList');
         const undoBtn = document.getElementById('undoBtn');
+        const editLastBtn = document.getElementById('editLastBtn');
 
         currentGameCard.classList.toggle('hidden', currentGame.length === 0);
         undoBtn.classList.toggle('hidden', currentGame.length === 0);
+        editLastBtn.classList.toggle('hidden', currentGame.length === 0);
 
         if (currentGame.length === 0) return;
 
@@ -855,11 +1075,12 @@
 
         [...currentGame].reverse().forEach((hand, reverseIdx) => {
             const handNumber = currentGame.length - reverseIdx;
+            const typeLabel = getScoringTypeLabel(hand);
 
             handsHtml += `
                 <div class="hand-item">
                     <button class="hand-header" onclick="toggleHand('hand-${hand.id}')">
-                        <span>Hand ${handNumber}</span>
+                        <span>Hand ${handNumber} · ${typeLabel}</span>
                         <span id="toggle-hand-${hand.id}">▼</span>
                     </button>
                     <div class="hand-content hidden" id="hand-${hand.id}">
@@ -883,6 +1104,13 @@
         });
 
         handsList.innerHTML = handsHtml;
+    }
+
+    function getScoringTypeLabel(hand) {
+        if (hand.scoringType === 'bigGin' || hand.bigGin) return 'Big Gin';
+        if (hand.scoringType === 'gin' || hand.knockerGin) return 'Gin';
+        if (hand.scoringType === 'undercut' || hand.knockerWon === false) return 'Undercut';
+        return 'Knock';
     }
 
     function renderCompletedGames() {
@@ -930,26 +1158,71 @@
         gamesList.innerHTML = gamesHtml;
     }
 
+    function exportBackup() {
+        const backup = {
+            exportedAt: new Date().toISOString(),
+            userId,
+            games,
+            currentGame,
+            playerNames
+        };
+
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `gin-rummy-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    function restoreBackup(event) {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (!Array.isArray(data.games) || !Array.isArray(data.currentGame) || typeof data.playerNames !== 'object') {
+                    alert('That backup file does not look valid.');
+                    return;
+                }
+
+                if (!confirm('Restore this backup? This will replace the games currently saved for this device/user.')) {
+                    return;
+                }
+
+                games = data.games;
+                currentGame = data.currentGame;
+                playerNames = data.playerNames;
+                saveData();
+                render();
+                alert('Backup restored.');
+            } catch (error) {
+                alert('Could not read that backup file.');
+            } finally {
+                event.target.value = '';
+            }
+        };
+        reader.readAsText(file);
+    }
+
     function render() {
         loadPlayerNamesToInputs();
 
         document.getElementById('knockerName').oninput = savePlayerNames;
         document.getElementById('opponentName').oninput = savePlayerNames;
-
-        document.getElementById('knockerGin').onchange = function() {
-            document.getElementById('knockerWonLabel').classList.toggle('hidden', this.checked);
-            document.getElementById('bigGinLabel').classList.toggle('hidden', !this.checked);
-
-            if (this.checked) {
-                document.getElementById('knockerWon').checked = true;
-            } else {
-                document.getElementById('bigGin').checked = false;
-            }
-        };
+        document.getElementById('knockerDeadwood').oninput = updatePreview;
+        document.getElementById('opponentDeadwood').oninput = updatePreview;
 
         renderStats();
+        renderStickyScore();
         renderCurrentGame();
         renderCompletedGames();
+        updatePreview();
     }
 
     function toggleHand(id) {
@@ -968,6 +1241,14 @@
         rulesArrow.textContent = rulesList.classList.contains('hidden') ? '▶' : '▼';
     }
 
+    function toggleSettings() {
+        const settingsList = document.getElementById('settingsList');
+        const settingsArrow = document.getElementById('settingsArrow');
+
+        settingsList.classList.toggle('hidden');
+        settingsArrow.textContent = settingsList.classList.contains('hidden') ? '▶' : '▼';
+    }
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
             navigator.serviceWorker.register('service-worker.js').catch(function(error) {
@@ -977,9 +1258,11 @@
     }
 
     async function initializeApp() {
+        makeQuickPointButtons();
         await initializeUserId();
         await loadDataFromServer();
         loadPlayerNamesToInputs();
+        setScoringMethod('knock');
         render();
     }
 

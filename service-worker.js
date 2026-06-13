@@ -1,4 +1,4 @@
-const CACHE_NAME = "gin-rummy-tracker-v1";
+const CACHE_NAME = "gin-rummy-tracker-v3";
 
 const FILES_TO_CACHE = [
   "./",
@@ -30,6 +30,26 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("fetch", event => {
+  const requestUrl = new URL(event.request.url);
+
+  if (requestUrl.pathname.startsWith("/api/")) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put("./index.html", responseClone));
+          return response;
+        })
+        .catch(() => caches.match("./index.html"))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(response => {
       return response || fetch(event.request);
