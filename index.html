@@ -643,6 +643,9 @@
     };
 
     let isSyncing = false;
+    let isPolling = false;
+    let pollInterval = null;
+    const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds
 
     async function initializeUserId() {
         // Use static userId so all devices access the same game history
@@ -698,6 +701,67 @@
     function saveData() {
         saveDataToServer();
     }
+
+    function dataHasChanged(newData) {
+        // Check if any of the main data has changed
+        if (JSON.stringify(games) !== JSON.stringify(newData.games)) return true;
+        if (JSON.stringify(currentGame) !== JSON.stringify(newData.currentGame)) return true;
+        if (JSON.stringify(playerNames) !== JSON.stringify(newData.playerNames)) return true;
+        return false;
+    }
+
+    async function pollForUpdates() {
+        if (isSyncing || isPolling || !userId) return;
+
+        isPolling = true;
+        try {
+            const response = await fetch(`${API_URL}/data`, {
+                headers: { 'x-user-id': userId }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (dataHasChanged(data)) {
+                    // Update local data with server data
+                    games = Array.isArray(data.games) ? data.games : [];
+                    currentGame = Array.isArray(data.currentGame) ? data.currentGame : [];
+                    playerNames = data.playerNames || { knocker: 'Player 1', opponent: 'Player 2' };
+                    // Refresh the UI
+                    render();
+                    console.log('Auto-synced data from server');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to poll for updates:', error);
+        } finally {
+            isPolling = false;
+        }
+    }
+
+    function startPolling() {
+        if (pollInterval) return; // Already polling
+        isPolling = false;
+        pollInterval = setInterval(pollForUpdates, POLL_INTERVAL_MS);
+        console.log('Started polling for updates');
+    }
+
+    function stopPolling() {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+            console.log('Stopped polling for updates');
+        }
+    }
+
+    // Handle focus/blur events to optimize battery usage
+    window.addEventListener('focus', () => {
+        startPolling();
+        // Also do an immediate check when user returns to the app
+        pollForUpdates();
+    });
+
+    window.addEventListener('blur', () => {
+        stopPolling();
+    });
 
     function savePlayerNames() {
         playerNames.knocker = document.getElementById('knockerName').value || 'Player 1';
@@ -1251,6 +1315,8 @@
         loadPlayerNamesToInputs();
         setScoringMethod('knock');
         render();
+        // Start polling for cross-device updates
+        startPolling();
     }
 
     initializeApp();
