@@ -645,21 +645,8 @@
     let isSyncing = false;
 
     async function initializeUserId() {
-        let storedUserId = localStorage.getItem('ginRummyUserId');
-        if (storedUserId) {
-            userId = storedUserId;
-        } else {
-            try {
-                const response = await fetch(`${API_URL}/user-id`);
-                const { userId: newUserId } = await response.json();
-                userId = newUserId;
-                localStorage.setItem('ginRummyUserId', userId);
-            } catch (error) {
-                console.error('Failed to get user ID:', error);
-                userId = 'default-user';
-                localStorage.setItem('ginRummyUserId', userId);
-            }
-        }
+        // Use static userId so all devices access the same game history
+        userId = 'gin-rummy-personal';
     }
 
     async function loadDataFromServer() {
