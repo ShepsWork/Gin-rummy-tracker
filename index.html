@@ -704,9 +704,10 @@
     }
 
     function dataHasChanged(newData) {
-        // Validate data structure - log warning if invalid
-        // Note: typeof null === 'object' in JavaScript, so check explicitly
-        if (!Array.isArray(newData.games) || !Array.isArray(newData.currentGame) || !newData.playerNames || typeof newData.playerNames !== 'object') {
+        // Validate data structure - ensure playerNames is not null/undefined and is an object
+        if (!Array.isArray(newData.games) || !Array.isArray(newData.currentGame) || 
+            newData.playerNames === null || newData.playerNames === undefined || 
+            typeof newData.playerNames !== 'object') {
             console.warn('Invalid data structure received from server, triggering refresh');
             return true; // Treat invalid data as a change to trigger refresh
         }
@@ -718,7 +719,9 @@
     }
 
     async function pollForUpdates() {
-        // Prevent overlapping polls - set flag immediately to prevent race conditions
+        // Prevent overlapping polls or syncs
+        // isSyncing is set to true when saveDataToServer() is in progress
+        // isPolling is set to true when pollForUpdates() is in progress
         if (isSyncing || isPolling || !userId) return;
         
         // Additional check: ensure minimum time has passed since last poll
@@ -779,7 +782,7 @@
     });
 
     // Also handle page visibility changes (e.g., switching between browser tabs)
-    if (document.addEventListener && document.hidden !== undefined) {
+    if ('hidden' in document) {
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
                 stopPolling();
