@@ -7,7 +7,7 @@ A PWA (Progressive Web App) for tracking gin rummy games with server-side persis
 - Track gin rummy game scores
 - Save games with date and time on the server
 - View game history and statistics
-- **Automatic cross-device syncing** - changes on one device appear on other devices in real-time
+- **Automatic cross-device syncing** - changes on one device appear on other devices within seconds (5-second polling interval)
 - Works offline (PWA with service worker caching)
 - Multi-device support with shared game history (one account, one history)
 - No user authentication required
@@ -68,10 +68,11 @@ This means:
 - No manual sync needed - just open the app on any device and your latest scores appear automatically
 - Works seamlessly even when switching between devices mid-game
 
-## Features
+## Technical Details
 
 - **Score Calculation**: Automatically calculates gin, knock, and undercut scores
 - **Game Tracking**: Tracks multiple games with winner determination
 - **Statistics**: Shows win counts and game history
 - **Persistent Storage**: All games are saved on the server
 - **Responsive Design**: Works on desktop and mobile devices
+

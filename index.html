@@ -739,7 +739,6 @@
 
     function startPolling() {
         if (pollInterval) return; // Already polling
-        isPolling = false;
         pollInterval = setInterval(pollForUpdates, POLL_INTERVAL_MS);
         console.log('Started polling for updates');
     }
