@@ -705,7 +705,8 @@
 
     function dataHasChanged(newData) {
         // Validate data structure - log warning if invalid
-        if (!Array.isArray(newData.games) || !Array.isArray(newData.currentGame) || typeof newData.playerNames !== 'object') {
+        // Note: typeof null === 'object' in JavaScript, so check explicitly
+        if (!Array.isArray(newData.games) || !Array.isArray(newData.currentGame) || !newData.playerNames || typeof newData.playerNames !== 'object') {
             console.warn('Invalid data structure received from server, triggering refresh');
             return true; // Treat invalid data as a change to trigger refresh
         }
@@ -717,16 +718,19 @@
     }
 
     async function pollForUpdates() {
-        // Prevent overlapping polls by checking if one is already in progress
-        if (isSyncing || isPolling || !userId) return;
+        // Prevent overlapping polls - set flag immediately to prevent race conditions
+        if (isSyncing || !userId) return;
+        if (isPolling) return;
         
         // Additional check: ensure minimum time has passed since last poll
         const now = Date.now();
         if (now - lastPollTime < POLL_INTERVAL_MS) return;
         
+        // Set flag immediately to prevent concurrent polls
+        isPolling = true;
         // Record poll start time to maintain consistent 5-second intervals
         lastPollTime = now;
-        isPolling = true;
+        
         try {
             const response = await fetch(`${API_URL}/data`, {
                 headers: { 'x-user-id': userId }
@@ -752,6 +756,8 @@
 
     function startPolling() {
         if (pollInterval) return; // Already polling
+        // Perform an immediate poll before starting the interval
+        pollForUpdates();
         pollInterval = setInterval(pollForUpdates, POLL_INTERVAL_MS);
         console.log('Started polling for updates');
     }
@@ -772,6 +778,17 @@
     window.addEventListener('blur', () => {
         stopPolling();
     });
+
+    // Also handle page visibility changes (e.g., switching between browser tabs)
+    if (document.addEventListener && document.hidden !== undefined) {
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopPolling();
+            } else {
+                startPolling();
+            }
+        });
+    }
 
     function savePlayerNames() {
         playerNames.knocker = document.getElementById('knockerName').value || 'Player 1';
