@@ -643,11 +643,6 @@
     };
 
     let isSyncing = false;
-    let isPolling = false;
-    let pollInterval = null;
-    let lastPollTime = 0;
-    let listenersRegistered = false;
-    const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds
 
     async function initializeUserId() {
         // Use static userId so all devices access the same game history
@@ -702,102 +697,6 @@
 
     function saveData() {
         saveDataToServer();
-    }
-
-    function dataHasChanged(newData) {
-        // Validate data structure - ensure playerNames is not null/undefined and is an object
-        if (!Array.isArray(newData.games) || !Array.isArray(newData.currentGame) || 
-            newData.playerNames === null || newData.playerNames === undefined || 
-            typeof newData.playerNames !== 'object') {
-            console.warn('Invalid data structure received from server, triggering refresh');
-            return true; // Treat invalid data as a change to trigger refresh
-        }
-        
-        // Use a single serialization for comparison
-        const currentState = JSON.stringify({ games, currentGame, playerNames });
-        const newState = JSON.stringify({ games: newData.games, currentGame: newData.currentGame, playerNames: newData.playerNames });
-        return currentState !== newState;
-    }
-
-    async function pollForUpdates() {
-        // Prevent overlapping polls or syncs
-        // isSyncing is set to true when saveDataToServer() is in progress
-        // isPolling is set to true when pollForUpdates() is in progress
-        if (isSyncing || isPolling || !userId) return;
-        
-        // Additional check: ensure minimum time has passed since last poll
-        const now = Date.now();
-        if (now - lastPollTime < POLL_INTERVAL_MS) return;
-        
-        // Set flag immediately to prevent concurrent polls
-        isPolling = true;
-        // Record poll start time to maintain consistent 5-second intervals
-        lastPollTime = now;
-        
-        try {
-            const response = await fetch(`${API_URL}/data`, {
-                headers: { 'x-user-id': userId }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                if (dataHasChanged(data)) {
-                    // Update local data with server data
-                    games = Array.isArray(data.games) ? data.games : [];
-                    currentGame = Array.isArray(data.currentGame) ? data.currentGame : [];
-                    playerNames = data.playerNames || { knocker: 'Player 1', opponent: 'Player 2' };
-                    // Refresh the UI
-                    render();
-                    console.log('Auto-synced data from server');
-                }
-            }
-        } catch (error) {
-            console.error('Failed to poll for updates:', error);
-        } finally {
-            isPolling = false;
-        }
-    }
-
-    function startPolling() {
-        if (pollInterval) return; // Already polling
-        // Perform an immediate poll before starting the interval
-        pollForUpdates();
-        // Set the interval after the guard check to prevent race conditions
-        pollInterval = setInterval(pollForUpdates, POLL_INTERVAL_MS);
-        console.log('Started polling for updates');
-    }
-
-    function stopPolling() {
-        if (pollInterval) {
-            clearInterval(pollInterval);
-            pollInterval = null;
-            console.log('Stopped polling for updates');
-        }
-    }
-
-    function registerEventListeners() {
-        // Only register listeners once to prevent duplicates
-        if (listenersRegistered) return;
-        listenersRegistered = true;
-
-        // Handle focus/blur events to optimize battery usage
-        window.addEventListener('focus', () => {
-            startPolling();
-        });
-
-        window.addEventListener('blur', () => {
-            stopPolling();
-        });
-
-        // Also handle page visibility changes (e.g., switching between browser tabs)
-        if ('hidden' in document) {
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    stopPolling();
-                } else {
-                    startPolling();
-                }
-            });
-        }
     }
 
     function savePlayerNames() {
@@ -1348,14 +1247,10 @@
     async function initializeApp() {
         makeQuickPointButtons();
         await initializeUserId();
-        // Register event listeners only once
-        registerEventListeners();
         await loadDataFromServer();
         loadPlayerNamesToInputs();
         setScoringMethod('knock');
         render();
-        // Start polling for cross-device updates
-        startPolling();
     }
 
     initializeApp();
