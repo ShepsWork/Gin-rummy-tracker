@@ -617,6 +617,11 @@
 
         <div class="rules-list hidden" id="settingsList">
             <p>Export a backup before big updates, or restore from a previous backup file.</p>
+            <p style="margin-top: 12px;">Server sync URL (include <code>/api</code>). Leave blank to use same-site <code>/api</code>.</p>
+            <div class="settings-actions">
+                <input type="url" id="apiUrlInput" placeholder="https://your-server.example.com/api" style="flex: 1; min-width: 220px;">
+                <button class="btn btn-secondary" onclick="saveApiUrl()">Save Sync URL</button>
+            </div>
             <div class="settings-actions">
                 <button class="btn btn-secondary" onclick="exportBackup()">Download Backup</button>
                 <button class="btn btn-secondary" onclick="document.getElementById('restoreFile').click()">Restore Backup</button>
@@ -625,12 +630,14 @@
         </div>
     </div>
 
-    <div class="small-note">Saved on server.</div>
+    <div class="small-note">Saved locally, with optional server sync.</div>
 </div>
 
 <script>
     const GAME_TARGET = 100;
-    const API_URL = '/api';
+    const DEFAULT_API_URL = '/api';
+    const STORAGE_KEY = 'gin-rummy-tracker-data-v1';
+    const API_URL_STORAGE_KEY = 'gin-rummy-api-url';
 
     let games = [];
     let currentGame = [];
@@ -645,22 +652,99 @@
     let isSyncing = false;
     let isPolling = false;
     let pollInterval = null;
+    let apiUrl = DEFAULT_API_URL;
+    let lastUpdatedAt = 0;
 
     async function initializeUserId() {
         // Use static userId so all devices access the same game history
         userId = 'gin-rummy-personal';
     }
 
+    function normalizeApiUrl(url) {
+        const value = (url || '').trim();
+        if (!value) return DEFAULT_API_URL;
+        return value.replace(/\/+$/, '');
+    }
+
+    function hasAnyData(dataGames, dataCurrentGame) {
+        return (Array.isArray(dataGames) && dataGames.length > 0)
+            || (Array.isArray(dataCurrentGame) && dataCurrentGame.length > 0);
+    }
+
+    function initializeApiUrl() {
+        apiUrl = normalizeApiUrl(localStorage.getItem(API_URL_STORAGE_KEY));
+    }
+
+    function loadApiUrlToInput() {
+        const input = document.getElementById('apiUrlInput');
+        if (!input) return;
+        input.value = apiUrl === DEFAULT_API_URL ? '' : apiUrl;
+    }
+
+    function saveApiUrl() {
+        const input = document.getElementById('apiUrlInput');
+        const nextApiUrl = normalizeApiUrl(input ? input.value : '');
+        apiUrl = nextApiUrl;
+
+        if (nextApiUrl === DEFAULT_API_URL) {
+            localStorage.removeItem(API_URL_STORAGE_KEY);
+        } else {
+            localStorage.setItem(API_URL_STORAGE_KEY, nextApiUrl);
+        }
+
+        saveData();
+        pollForUpdates();
+    }
+
+    function saveDataToLocal(updatedAt = Date.now()) {
+        lastUpdatedAt = updatedAt;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            games,
+            currentGame,
+            playerNames,
+            updatedAt: lastUpdatedAt
+        }));
+    }
+
+    function loadDataFromLocal() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return false;
+            const data = JSON.parse(raw);
+            games = Array.isArray(data.games) ? data.games : [];
+            currentGame = Array.isArray(data.currentGame) ? data.currentGame : [];
+            playerNames = data.playerNames || { knocker: 'Player 1', opponent: 'Player 2' };
+            lastUpdatedAt = Number(data.updatedAt) || 0;
+            return true;
+        } catch (error) {
+            console.error('Failed to load local data:', error);
+            return false;
+        }
+    }
+
     async function loadDataFromServer() {
         try {
-            const response = await fetch(`${API_URL}/data`, {
+            const response = await fetch(`${apiUrl}/data`, {
                 headers: { 'x-user-id': userId }
             });
             if (response.ok) {
                 const data = await response.json();
-                games = Array.isArray(data.games) ? data.games : [];
-                currentGame = Array.isArray(data.currentGame) ? data.currentGame : [];
-                playerNames = data.playerNames || { knocker: 'Player 1', opponent: 'Player 2' };
+                const serverGames = Array.isArray(data.games) ? data.games : [];
+                const serverCurrentGame = Array.isArray(data.currentGame) ? data.currentGame : [];
+                const serverPlayerNames = data.playerNames || { knocker: 'Player 1', opponent: 'Player 2' };
+                const serverUpdatedAt = Number(data.updatedAt) || 0;
+                const hasLocalData = hasAnyData(games, currentGame);
+                const hasServerData = hasAnyData(serverGames, serverCurrentGame);
+
+                if (!hasLocalData || serverUpdatedAt >= lastUpdatedAt || (hasServerData && !hasLocalData)) {
+                    games = serverGames;
+                    currentGame = serverCurrentGame;
+                    playerNames = serverPlayerNames;
+                    saveDataToLocal(serverUpdatedAt || Date.now());
+                } else if (hasLocalData && !hasServerData) {
+                    await saveDataToServer();
+                }
+
                 return true;
             }
         } catch (error) {
@@ -674,7 +758,7 @@
 
         isSyncing = true;
         try {
-            const response = await fetch(`${API_URL}/data`, {
+            const response = await fetch(`${apiUrl}/data`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -683,7 +767,8 @@
                 body: JSON.stringify({
                     games,
                     currentGame,
-                    playerNames
+                    playerNames,
+                    updatedAt: lastUpdatedAt || Date.now()
                 })
             });
 
@@ -698,6 +783,7 @@
     }
 
     function saveData() {
+        saveDataToLocal();
         saveDataToServer();
     }
 
@@ -1215,6 +1301,7 @@
 
     function render() {
         loadPlayerNamesToInputs();
+        loadApiUrlToInput();
 
         document.getElementById('knockerName').oninput = savePlayerNames;
         document.getElementById('opponentName').oninput = savePlayerNames;
@@ -1263,6 +1350,8 @@
     async function initializeApp() {
         makeQuickPointButtons();
         await initializeUserId();
+        initializeApiUrl();
+        loadDataFromLocal();
         await loadDataFromServer();
         loadPlayerNamesToInputs();
         setScoringMethod('knock');

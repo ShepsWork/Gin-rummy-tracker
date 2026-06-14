@@ -8,7 +8,8 @@ A PWA (Progressive Web App) for tracking gin rummy games with server-side persis
 - Save games with date and time on the server
 - View game history and statistics
 - Works offline (PWA with service worker caching)
-- Multi-device support with per-user server storage
+- Local-first persistence in browser storage
+- Optional multi-device sync when a server API is configured
 
 ## Installation and Running
 
@@ -49,9 +50,19 @@ npm run dev
 
 ## Data Storage
 
-Games are stored server-side in the `data/` directory as JSON files, one file per user ID.
+Games are always stored locally in browser storage.
 
-Each user is identified by a UUID that is generated on first use and stored in `localStorage`.
+If a sync API is available, data is also saved server-side in the `data/` directory as JSON files, one file per user ID.
+
+The app uses a shared user ID by default (`gin-rummy-personal`) so multiple devices can sync when pointed at the same server API.
+
+## GitHub Pages
+
+GitHub Pages only hosts static files and does not run `server.js`.  
+When running on GitHub Pages:
+
+- Local persistence still works.
+- To enable cross-device sync, set **Server sync URL** in app settings to a hosted API endpoint that serves this repo's `/api` routes.
 
 ## Features
 
