@@ -704,9 +704,10 @@
     }
 
     function dataHasChanged(newData) {
-        // Optimize by checking basic properties first before deep comparison
+        // Validate data structure - log warning if invalid
         if (!Array.isArray(newData.games) || !Array.isArray(newData.currentGame) || typeof newData.playerNames !== 'object') {
-            return false; // Invalid data structure
+            console.warn('Invalid data structure received from server, triggering refresh');
+            return true; // Treat invalid data as a change to trigger refresh
         }
         
         // Use a single serialization for comparison
@@ -722,7 +723,9 @@
         // Additional check: ensure minimum time has passed since last poll
         const now = Date.now();
         if (now - lastPollTime < POLL_INTERVAL_MS) return;
-
+        
+        // Record poll start time to maintain consistent 5-second intervals
+        lastPollTime = now;
         isPolling = true;
         try {
             const response = await fetch(`${API_URL}/data`, {
@@ -744,7 +747,6 @@
             console.error('Failed to poll for updates:', error);
         } finally {
             isPolling = false;
-            lastPollTime = Date.now();
         }
     }
 
@@ -765,8 +767,6 @@
     // Handle focus/blur events to optimize battery usage
     window.addEventListener('focus', () => {
         startPolling();
-        // Also do an immediate check when user returns to the app
-        pollForUpdates();
     });
 
     window.addEventListener('blur', () => {
