@@ -719,8 +719,7 @@
 
     async function pollForUpdates() {
         // Prevent overlapping polls - set flag immediately to prevent race conditions
-        if (isSyncing || !userId) return;
-        if (isPolling) return;
+        if (isSyncing || isPolling || !userId) return;
         
         // Additional check: ensure minimum time has passed since last poll
         const now = Date.now();
