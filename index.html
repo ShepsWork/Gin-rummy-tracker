@@ -699,6 +699,15 @@
         saveDataToServer();
     }
 
+    async function pollForUpdates() {
+        if (isSyncing) return;
+        const loaded = await loadDataFromServer();
+        if (loaded) {
+            loadPlayerNamesToInputs();
+            render();
+        }
+    }
+
     function savePlayerNames() {
         playerNames.knocker = document.getElementById('knockerName').value || 'Player 1';
         playerNames.opponent = document.getElementById('opponentName').value || 'Player 2';
@@ -1251,6 +1260,16 @@
         loadPlayerNamesToInputs();
         setScoringMethod('knock');
         render();
+
+        // Poll the server every 15 seconds so all open devices stay in sync
+        setInterval(pollForUpdates, 15000);
+
+        // Also refresh immediately when the tab/app becomes visible again (e.g. switching back on mobile)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                pollForUpdates();
+            }
+        });
     }
 
     initializeApp();
