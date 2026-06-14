@@ -643,6 +643,8 @@
     };
 
     let isSyncing = false;
+    let isPolling = false;
+    let pollInterval = null;
 
     async function initializeUserId() {
         // Use static userId so all devices access the same game history
@@ -700,11 +702,16 @@
     }
 
     async function pollForUpdates() {
-        if (isSyncing) return;
-        const loaded = await loadDataFromServer();
-        if (loaded) {
-            loadPlayerNamesToInputs();
-            render();
+        if (isSyncing || isPolling) return;
+        isPolling = true;
+        try {
+            const loaded = await loadDataFromServer();
+            if (loaded) {
+                loadPlayerNamesToInputs();
+                render();
+            }
+        } finally {
+            isPolling = false;
         }
     }
 
@@ -1262,14 +1269,18 @@
         render();
 
         // Poll the server every 15 seconds so all open devices stay in sync
-        setInterval(pollForUpdates, 15000);
+        if (pollInterval) clearInterval(pollInterval);
+        pollInterval = setInterval(pollForUpdates, 15000);
 
         // Also refresh immediately when the tab/app becomes visible again (e.g. switching back on mobile)
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                pollForUpdates();
-            }
-        });
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+
+    function onVisibilityChange() {
+        if (document.visibilityState === 'visible') {
+            pollForUpdates();
+        }
     }
 
     initializeApp();
