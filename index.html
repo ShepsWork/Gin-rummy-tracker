@@ -645,6 +645,7 @@
     let isSyncing = false;
     let isPolling = false;
     let pollInterval = null;
+    let lastPollTime = 0;
     const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds
 
     async function initializeUserId() {
@@ -703,15 +704,24 @@
     }
 
     function dataHasChanged(newData) {
-        // Check if any of the main data has changed
-        if (JSON.stringify(games) !== JSON.stringify(newData.games)) return true;
-        if (JSON.stringify(currentGame) !== JSON.stringify(newData.currentGame)) return true;
-        if (JSON.stringify(playerNames) !== JSON.stringify(newData.playerNames)) return true;
-        return false;
+        // Optimize by checking basic properties first before deep comparison
+        if (!Array.isArray(newData.games) || !Array.isArray(newData.currentGame) || typeof newData.playerNames !== 'object') {
+            return false; // Invalid data structure
+        }
+        
+        // Use a single serialization for comparison
+        const currentState = JSON.stringify({ games, currentGame, playerNames });
+        const newState = JSON.stringify({ games: newData.games, currentGame: newData.currentGame, playerNames: newData.playerNames });
+        return currentState !== newState;
     }
 
     async function pollForUpdates() {
+        // Prevent overlapping polls by checking if one is already in progress
         if (isSyncing || isPolling || !userId) return;
+        
+        // Additional check: ensure minimum time has passed since last poll
+        const now = Date.now();
+        if (now - lastPollTime < POLL_INTERVAL_MS) return;
 
         isPolling = true;
         try {
@@ -734,6 +744,7 @@
             console.error('Failed to poll for updates:', error);
         } finally {
             isPolling = false;
+            lastPollTime = Date.now();
         }
     }
 
