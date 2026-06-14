@@ -477,6 +477,13 @@
             margin-top: 10px;
         }
 
+        .settings-note { margin-top: 12px; }
+
+        .settings-url-input {
+            width: 100%;
+            min-width: 220px;
+        }
+
         .small-note {
             font-size: 13px;
             color: #6b7280;
@@ -617,9 +624,9 @@
 
         <div class="rules-list hidden" id="settingsList">
             <p>Export a backup before big updates, or restore from a previous backup file.</p>
-            <p style="margin-top: 12px;">Server sync URL (include <code>/api</code>). Leave blank to use same-site <code>/api</code>.</p>
+            <p class="settings-note">Server sync URL (e.g., <code>https://your-server.example.com/api</code>). Leave blank to use same-site <code>/api</code>.</p>
             <div class="settings-actions">
-                <input type="url" id="apiUrlInput" placeholder="https://your-server.example.com/api" style="flex: 1; min-width: 220px;">
+                <input class="settings-url-input" type="text" id="apiUrlInput" placeholder="https://your-server.example.com/api">
                 <button class="btn btn-secondary" onclick="saveApiUrl()">Save Sync URL</button>
             </div>
             <div class="settings-actions">
@@ -661,9 +668,9 @@
     }
 
     function normalizeApiUrl(url) {
-        const value = (url || '').trim();
-        if (!value) return DEFAULT_API_URL;
-        return value.replace(/\/+$/, '');
+        const trimmedUrl = (url || '').trim();
+        if (!trimmedUrl) return DEFAULT_API_URL;
+        return trimmedUrl.replace(/\/+$/, '');
     }
 
     function hasAnyData(dataGames, dataCurrentGame) {
@@ -681,9 +688,24 @@
         input.value = apiUrl === DEFAULT_API_URL ? '' : apiUrl;
     }
 
-    function saveApiUrl() {
+    async function saveApiUrl() {
         const input = document.getElementById('apiUrlInput');
-        const nextApiUrl = normalizeApiUrl(input ? input.value : '');
+        const rawValue = input ? input.value.trim() : '';
+
+        if (rawValue && !rawValue.startsWith('/')) {
+            try {
+                const parsed = new URL(rawValue);
+                if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+                    alert('Server sync URL must use http:// or https:// protocol.');
+                    return;
+                }
+            } catch {
+                alert('Enter a valid server sync URL.');
+                return;
+            }
+        }
+
+        const nextApiUrl = normalizeApiUrl(rawValue);
         apiUrl = nextApiUrl;
 
         if (nextApiUrl === DEFAULT_API_URL) {
@@ -692,18 +714,23 @@
             localStorage.setItem(API_URL_STORAGE_KEY, nextApiUrl);
         }
 
-        saveData();
-        pollForUpdates();
+        const timestamp = Date.now();
+        await saveData(timestamp);
+        await pollForUpdates();
     }
 
     function saveDataToLocal(updatedAt = Date.now()) {
-        lastUpdatedAt = updatedAt;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-            games,
-            currentGame,
-            playerNames,
-            updatedAt: lastUpdatedAt
-        }));
+        try {
+            lastUpdatedAt = updatedAt;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                games,
+                currentGame,
+                playerNames,
+                updatedAt: lastUpdatedAt
+            }));
+        } catch (error) {
+            console.error('Failed to save local data:', error);
+        }
     }
 
     function loadDataFromLocal() {
@@ -714,7 +741,15 @@
             games = Array.isArray(data.games) ? data.games : [];
             currentGame = Array.isArray(data.currentGame) ? data.currentGame : [];
             playerNames = data.playerNames || { knocker: 'Player 1', opponent: 'Player 2' };
-            lastUpdatedAt = Number(data.updatedAt) || 0;
+            const parsedUpdatedAt = Number(data.updatedAt);
+            if (Number.isFinite(parsedUpdatedAt) && parsedUpdatedAt > 0) {
+                lastUpdatedAt = parsedUpdatedAt;
+            } else if (hasAnyData(games, currentGame)) {
+                lastUpdatedAt = Date.now();
+                saveDataToLocal(lastUpdatedAt);
+            } else {
+                lastUpdatedAt = 0;
+            }
             return true;
         } catch (error) {
             console.error('Failed to load local data:', error);
@@ -735,13 +770,17 @@
                 const serverUpdatedAt = Number(data.updatedAt) || 0;
                 const hasLocalData = hasAnyData(games, currentGame);
                 const hasServerData = hasAnyData(serverGames, serverCurrentGame);
+                const hasLocalTimestamp = lastUpdatedAt > 0;
 
-                if (!hasLocalData || serverUpdatedAt >= lastUpdatedAt || (hasServerData && !hasLocalData)) {
+                const shouldUseServerData = !hasLocalData || (hasLocalTimestamp && serverUpdatedAt > lastUpdatedAt);
+
+                if (shouldUseServerData) {
                     games = serverGames;
                     currentGame = serverCurrentGame;
                     playerNames = serverPlayerNames;
-                    saveDataToLocal(serverUpdatedAt || Date.now());
+                    saveDataToLocal(serverUpdatedAt > 0 ? serverUpdatedAt : Date.now());
                 } else if (hasLocalData && !hasServerData) {
+                    console.info('Server returned no game data; uploading local data to restore sync.');
                     await saveDataToServer();
                 }
 
@@ -753,11 +792,13 @@
         return false;
     }
 
-    async function saveDataToServer() {
+    async function saveDataToServer(updatedAt = lastUpdatedAt) {
         if (isSyncing || !userId) return;
 
         isSyncing = true;
         try {
+            const payloadUpdatedAt = updatedAt > 0 ? updatedAt : Date.now();
+
             const response = await fetch(`${apiUrl}/data`, {
                 method: 'POST',
                 headers: {
@@ -768,12 +809,14 @@
                     games,
                     currentGame,
                     playerNames,
-                    updatedAt: lastUpdatedAt || Date.now()
+                    updatedAt: payloadUpdatedAt
                 })
             });
 
             if (!response.ok) {
                 console.error('Failed to save data to server');
+            } else {
+                lastUpdatedAt = payloadUpdatedAt;
             }
         } catch (error) {
             console.error('Failed to save data to server:', error);
@@ -782,9 +825,9 @@
         }
     }
 
-    function saveData() {
-        saveDataToLocal();
-        saveDataToServer();
+    function saveData(updatedAt = Date.now()) {
+        saveDataToLocal(updatedAt);
+        return saveDataToServer(updatedAt);
     }
 
     async function pollForUpdates() {
