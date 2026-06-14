@@ -646,6 +646,7 @@
     let isPolling = false;
     let pollInterval = null;
     let lastPollTime = 0;
+    let listenersRegistered = false;
     const POLL_INTERVAL_MS = 5000; // Poll every 5 seconds
 
     async function initializeUserId() {
@@ -760,6 +761,7 @@
         if (pollInterval) return; // Already polling
         // Perform an immediate poll before starting the interval
         pollForUpdates();
+        // Set the interval after the guard check to prevent race conditions
         pollInterval = setInterval(pollForUpdates, POLL_INTERVAL_MS);
         console.log('Started polling for updates');
     }
@@ -772,24 +774,30 @@
         }
     }
 
-    // Handle focus/blur events to optimize battery usage
-    window.addEventListener('focus', () => {
-        startPolling();
-    });
+    function registerEventListeners() {
+        // Only register listeners once to prevent duplicates
+        if (listenersRegistered) return;
+        listenersRegistered = true;
 
-    window.addEventListener('blur', () => {
-        stopPolling();
-    });
-
-    // Also handle page visibility changes (e.g., switching between browser tabs)
-    if ('hidden' in document) {
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                stopPolling();
-            } else {
-                startPolling();
-            }
+        // Handle focus/blur events to optimize battery usage
+        window.addEventListener('focus', () => {
+            startPolling();
         });
+
+        window.addEventListener('blur', () => {
+            stopPolling();
+        });
+
+        // Also handle page visibility changes (e.g., switching between browser tabs)
+        if ('hidden' in document) {
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    stopPolling();
+                } else {
+                    startPolling();
+                }
+            });
+        }
     }
 
     function savePlayerNames() {
@@ -1340,6 +1348,8 @@
     async function initializeApp() {
         makeQuickPointButtons();
         await initializeUserId();
+        // Register event listeners only once
+        registerEventListeners();
         await loadDataFromServer();
         loadPlayerNamesToInputs();
         setScoringMethod('knock');
