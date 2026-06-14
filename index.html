@@ -1272,14 +1272,22 @@
         if (pollInterval) clearInterval(pollInterval);
         pollInterval = setInterval(pollForUpdates, 15000);
 
-        // Also refresh immediately when the tab/app becomes visible again (e.g. switching back on mobile)
-        document.removeEventListener('visibilitychange', onVisibilityChange);
+        // Pause polling when the tab is hidden, resume (and immediately refresh) when visible
         document.addEventListener('visibilitychange', onVisibilityChange);
     }
 
     function onVisibilityChange() {
         if (document.visibilityState === 'visible') {
+            // Restart polling and fetch immediately when the tab/app comes back into view
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(pollForUpdates, 15000);
             pollForUpdates();
+        } else {
+            // Stop polling while the tab/app is in the background
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
         }
     }
 
