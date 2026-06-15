@@ -79,28 +79,17 @@ jobs:
           IMAGE_TAG: ${{ steps.meta.outputs.short_sha }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
+        run: ssh "${VM_USER}@${VM_HOST}" bash << 'REMOTE_SCRIPT'
+set -euo pipefail
+APP_DIR="/opt/infra-new/apps/gin-rummy-tracker"
+mkdir -p "${APP_DIR}/data"
 
-          ssh "${VM_USER}@${VM_HOST}" \
-            GHCR_USER="${GHCR_USER}" \
-            GHCR_TOKEN="${GHCR_TOKEN}" \
-            IMAGE_REPO="${IMAGE_REPO}" \
-            IMAGE_TAG="${IMAGE_TAG}" \
-            bash <<'SSHEOF'
-          set -euo pipefail
-
-          APP_DIR="/opt/infra-new/apps/gin-rummy-tracker"
-          mkdir -p "${APP_DIR}/data"
-
-          # Write docker-compose.prod.yml with Traefik integration
-          cat > "${APP_DIR}/docker-compose.prod.yml" <<'COMPOSE'
+# Create docker-compose.prod.yml
+tee "${APP_DIR}/docker-compose.prod.yml" > /dev/null << 'COMPOSE_EOF'
 version: '3.8'
-
 networks:
   edge:
     external: true
-
 services:
   gin-rummy-server:
     container_name: gin-rummy-server
@@ -121,18 +110,14 @@ services:
       - "traefik.http.routers.gin-rummy.tls.certresolver=cloudflare"
       - "traefik.http.services.gin-rummy.loadbalancer.server.port=3000"
     restart: unless-stopped
-COMPOSE
+COMPOSE_EOF
 
-          # Update image reference in compose file
-          sed -i "s|image:.*|image: ${IMAGE_REPO}:${IMAGE_TAG}|" "${APP_DIR}/docker-compose.prod.yml"
-
-          cd "${APP_DIR}"
-          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-          docker compose -f docker-compose.prod.yml pull
-          docker compose -f docker-compose.prod.yml up -d --remove-orphans
-
-          # Verify health check passes
-          sleep 2
-          curl -fsS http://127.0.0.1:3000/health || exit 1
-          echo "✅ Deployment successful - backend is healthy"
-          SSHEOF
+cd "${APP_DIR}"
+docker login ghcr.io -u "$GHCR_USER" --password-stdin <<< "$GHCR_TOKEN"
+docker pull "$IMAGE_REPO:$IMAGE_TAG"
+docker tag "$IMAGE_REPO:$IMAGE_TAG" gin-rummy-tracker:latest
+docker compose -f docker-compose.prod.yml up -d --remove-orphans
+sleep 2
+curl -fsS http://127.0.0.1:3000/health || exit 1
+echo "✅ Deployment successful - backend is healthy"
+REMOTE_SCRIPT
