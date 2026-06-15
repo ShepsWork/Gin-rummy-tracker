@@ -10,7 +10,10 @@ on:
 # - ORACLE_VM_SSH_KEY: private SSH key for the deploy user on the Oracle VM
 # - ORACLE_VM_HOST: Tailscale IP or MagicDNS hostname of the Oracle VM
 # - ORACLE_VM_USER: SSH username on the Oracle VM
-# - TAILSCALE_AUTHKEY: Tailscale auth key for this GitHub Actions runner
+#
+# Cloudflare Tunnel Setup:
+# - Ingress rule configured in Cloudflare dashboard:
+#   gin-rummy.yancmo.xyz → http://localhost:3000
 
 permissions:
   contents: read
@@ -55,11 +58,6 @@ jobs:
             ${{ steps.meta.outputs.image_repo }}:latest
             ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.short_sha }}
 
-      - name: Connect runner to Tailscale
-        uses: tailscale/github-action@v2
-        with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-
       - name: Configure SSH key
         shell: bash
         env:
@@ -93,9 +91,9 @@ jobs:
           set -euo pipefail
 
           APP_DIR="/opt/infra-new/apps/gin-rummy-tracker"
-          mkdir -p "\${APP_DIR}/data"
+          mkdir -p "${APP_DIR}/data"
 
-          cat > "\${APP_DIR}/docker-compose.prod.yml" <<COMPOSE
+          cat > "${APP_DIR}/docker-compose.prod.yml" <<COMPOSE
           services:
             gin-rummy-server:
               image: \${IMAGE_REPO}:\${IMAGE_TAG}
@@ -110,10 +108,13 @@ jobs:
               restart: unless-stopped
           COMPOSE
 
-          cd "\${APP_DIR}"
-          echo "\${GHCR_TOKEN}" | docker login ghcr.io -u "\${GHCR_USER}" --password-stdin
+          cd "${APP_DIR}"
+          echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-          curl -fsS http://127.0.0.1:3000/health
+          # Verify health check passes
+          sleep 2
+          curl -fsS http://127.0.0.1:3000/health || exit 1
+          echo "✅ Deployment successful - backend is healthy"
           EOF
