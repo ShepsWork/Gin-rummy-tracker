@@ -65,8 +65,18 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.ORACLE_VM_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "100.81.231.58" >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
+          
+          # Configure SSH to skip host key verification (GitHub Actions may not reach host key server)
+          cat > ~/.ssh/config << 'SSH_CONFIG_EOF'
+          Host 100.81.231.58
+            HostName 100.81.231.58
+            User ubuntu
+            IdentityFile ~/.ssh/id_ed25519
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            LogLevel QUIET
+          SSH_CONFIG_EOF
+          chmod 600 ~/.ssh/config
 
       - name: Deploy on Oracle VM via native SSH
         shell: bash
@@ -77,7 +87,8 @@ jobs:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ssh "${VM_USER}@100.81.231.58" bash << 'REMOTE_SCRIPT'
+          # Use configured SSH host alias
+          ssh -v 100.81.231.58 bash << 'REMOTE_SCRIPT'
           set -euo pipefail
           APP_DIR="/opt/infra-new/apps/gin-rummy-tracker"
           mkdir -p "${APP_DIR}/data"
