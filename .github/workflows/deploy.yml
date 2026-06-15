@@ -1,0 +1,119 @@
+name: Deploy to Oracle VM
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Required repository secrets:
+# - ORACLE_VM_SSH_KEY: private SSH key for the deploy user on the Oracle VM
+# - ORACLE_VM_HOST: Tailscale IP or MagicDNS hostname of the Oracle VM
+# - ORACLE_VM_USER: SSH username on the Oracle VM
+# - TAILSCALE_AUTHKEY: Tailscale auth key for this GitHub Actions runner
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: gin-rummy-tracker-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Derive image tags
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_repo="ghcr.io/${GITHUB_REPOSITORY}"
+          image_repo="$(echo "${image_repo}" | tr '[:upper:]' '[:lower:]')"
+          short_sha="${GITHUB_SHA::7}"
+          echo "image_repo=${image_repo}" >> "${GITHUB_OUTPUT}"
+          echo "short_sha=${short_sha}" >> "${GITHUB_OUTPUT}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_repo }}:latest
+            ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.short_sha }}
+
+      - name: Connect runner to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Configure SSH key
+        shell: bash
+        env:
+          VM_HOST: ${{ secrets.ORACLE_VM_HOST }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.ORACLE_VM_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${VM_HOST}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy on Oracle VM via native SSH
+        shell: bash
+        env:
+          VM_HOST: ${{ secrets.ORACLE_VM_HOST }}
+          VM_USER: ${{ secrets.ORACLE_VM_USER }}
+          IMAGE_REPO: ${{ steps.meta.outputs.image_repo }}
+          IMAGE_TAG: ${{ steps.meta.outputs.short_sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          ssh "${VM_USER}@${VM_HOST}" \
+            GHCR_USER="${GHCR_USER}" \
+            GHCR_TOKEN="${GHCR_TOKEN}" \
+            IMAGE_REPO="${IMAGE_REPO}" \
+            IMAGE_TAG="${IMAGE_TAG}" \
+            'bash -s' <<'EOF'
+          set -euo pipefail
+
+          APP_DIR="/opt/infra-new/apps/gin-rummy-tracker"
+          mkdir -p "\${APP_DIR}/data"
+
+          cat > "\${APP_DIR}/docker-compose.prod.yml" <<COMPOSE
+          services:
+            gin-rummy-server:
+              image: \${IMAGE_REPO}:\${IMAGE_TAG}
+              container_name: gin-rummy-server
+              ports:
+                - "127.0.0.1:3000:3000"
+              environment:
+                - PORT=3000
+                - NODE_ENV=production
+              volumes:
+                - /opt/infra-new/apps/gin-rummy-tracker/data:/app/data
+              restart: unless-stopped
+          COMPOSE
+
+          cd "\${APP_DIR}"
+          echo "\${GHCR_TOKEN}" | docker login ghcr.io -u "\${GHCR_USER}" --password-stdin
+          docker compose -f docker-compose.prod.yml pull
+          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+          curl -fsS http://127.0.0.1:3000/health
+          EOF
