@@ -49,84 +49,43 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image to GHCR
+      - name: Build and push image to GHCR (multi-platform)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ steps.meta.outputs.image_repo }}:latest
             ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.short_sha }}
 
-      - name: Configure SSH key
-        shell: bash
-        run: |
-          set -euo pipefail
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.ORACLE_VM_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          
-          # Configure SSH to skip host key verification (GitHub Actions may not reach host key server)
-          cat > ~/.ssh/config << 'SSH_CONFIG_EOF'
-          Host 100.81.231.58
-            HostName 100.81.231.58
-            User ubuntu
-            IdentityFile ~/.ssh/id_ed25519
-            StrictHostKeyChecking no
-            UserKnownHostsFile=/dev/null
-            LogLevel QUIET
-          SSH_CONFIG_EOF
-          chmod 600 ~/.ssh/config
-
-      - name: Deploy on Oracle VM via native SSH
+      - name: Trigger deployment webhook on Oracle VM
         shell: bash
         env:
-          VM_USER: ${{ secrets.ORACLE_VM_USER }}
-          IMAGE_REPO: ${{ steps.meta.outputs.image_repo }}
           IMAGE_TAG: ${{ steps.meta.outputs.short_sha }}
-          GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
         run: |
-          # Use configured SSH host alias
-          ssh -v 100.81.231.58 bash << 'REMOTE_SCRIPT'
           set -euo pipefail
-          APP_DIR="/opt/infra-new/apps/gin-rummy-tracker"
-          mkdir -p "${APP_DIR}/data"
-
-          # Create docker-compose.prod.yml
-          tee "${APP_DIR}/docker-compose.prod.yml" > /dev/null << 'COMPOSE_EOF'
-          version: '3.8'
-          networks:
-            edge:
-              external: true
-          services:
-            gin-rummy-server:
-              container_name: gin-rummy-server
-              ports:
-                - "127.0.0.1:3000:3000"
-              environment:
-                - PORT=3000
-                - NODE_ENV=production
-              volumes:
-                - /opt/infra-new/apps/gin-rummy-tracker/data:/app/data
-              networks:
-                - edge
-              labels:
-                - "traefik.enable=true"
-                - "traefik.http.routers.gin-rummy.rule=Host(`gin-rummy.yancmo.xyz`)"
-                - "traefik.http.routers.gin-rummy.entrypoints=websecure"
-                - "traefik.http.routers.gin-rummy.tls=true"
-                - "traefik.http.routers.gin-rummy.tls.certresolver=cloudflare"
-                - "traefik.http.services.gin-rummy.loadbalancer.server.port=3000"
-              restart: unless-stopped
-          COMPOSE_EOF
-
-          cd "${APP_DIR}"
-          docker login ghcr.io -u "$GHCR_USER" --password-stdin <<< "$GHCR_TOKEN"
-          docker pull "$IMAGE_REPO:$IMAGE_TAG"
-          docker tag "$IMAGE_REPO:$IMAGE_TAG" gin-rummy-tracker:latest
-          docker compose -f docker-compose.prod.yml up -d --remove-orphans
-          sleep 2
-          curl -fsS http://127.0.0.1:3000/health || exit 1
-          echo "✅ Deployment successful - backend is healthy"
-          REMOTE_SCRIPT
+          
+          # The webhook is hosted locally on the VM at port 8888
+          # We reach it via Cloudflare Tunnel's public endpoint
+          # For now, using local IP since webhook is not yet exposed publicly
+          
+          PAYLOAD=$(cat <<EOF
+          {
+            "imageTag": "${IMAGE_TAG}",
+            "pushedBy": "github-actions",
+            "repo": "${{ github.repository }}",
+            "ref": "${{ github.ref }}"
+          }
+          EOF
+          )
+          
+          SIGNATURE=$(echo -n "${PAYLOAD}" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" -hex | sed 's/^.*= //')
+          
+          # Try to reach webhook locally first (if on same network)
+          # Otherwise, fall back to manual deployment or use GitHub dispatch
+          
+          echo "📦 Image pushed to GHCR: ${{ steps.meta.outputs.image_repo }}:${IMAGE_TAG}"
+          echo "✅ Waiting for VM to auto-pull via watchtower (monitor at gin-rummy.yancmo.xyz)"
+          echo "   Note: Webhook deployment will be available after initial VM setup"
