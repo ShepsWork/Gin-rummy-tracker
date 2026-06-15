@@ -8,12 +8,12 @@ on:
 
 # Required repository secrets:
 # - ORACLE_VM_SSH_KEY: private SSH key for the deploy user on the Oracle VM
-# - ORACLE_VM_HOST: Tailscale IP or MagicDNS hostname of the Oracle VM
-# - ORACLE_VM_USER: SSH username on the Oracle VM
+# - ORACLE_VM_USER: SSH username on the Oracle VM (default: ubuntu)
 #
-# Cloudflare Tunnel Setup:
-# - Ingress rule configured in Cloudflare dashboard:
-#   gin-rummy.yancmo.xyz → http://localhost:3000
+# Note: Deploy target is hardcoded to Oracle VM public IP (100.81.231.58)
+# since GitHub Actions runners can't access Tailscale or private networks.
+#
+# Traefik routing configured for: gin-rummy.yancmo.xyz
 
 permissions:
   contents: read
@@ -60,27 +60,24 @@ jobs:
 
       - name: Configure SSH key
         shell: bash
-        env:
-          VM_HOST: ${{ secrets.ORACLE_VM_HOST }}
         run: |
           set -euo pipefail
           install -m 700 -d ~/.ssh
           printf '%s\n' "${{ secrets.ORACLE_VM_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${VM_HOST}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "100.81.231.58" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
       - name: Deploy on Oracle VM via native SSH
         shell: bash
         env:
-          VM_HOST: ${{ secrets.ORACLE_VM_HOST }}
           VM_USER: ${{ secrets.ORACLE_VM_USER }}
           IMAGE_REPO: ${{ steps.meta.outputs.image_repo }}
           IMAGE_TAG: ${{ steps.meta.outputs.short_sha }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ssh "${VM_USER}@${VM_HOST}" bash << 'REMOTE_SCRIPT'
+          ssh "${VM_USER}@100.81.231.58" bash << 'REMOTE_SCRIPT'
           set -euo pipefail
           APP_DIR="/opt/infra-new/apps/gin-rummy-tracker"
           mkdir -p "${APP_DIR}/data"
