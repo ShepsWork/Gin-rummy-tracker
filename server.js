@@ -23,11 +23,9 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // Generate or get user ID from request
+// Defaults to 'gin-rummy-personal' for cross-device sync
 const getUserId = (req) => {
-  let userId = req.headers['x-user-id'];
-  if (!userId) {
-    userId = uuidv4();
-  }
+  const userId = req.headers['x-user-id'] || 'gin-rummy-personal';
   return userId;
 };
 
@@ -56,6 +54,11 @@ const saveUserData = (userId, data) => {
 };
 
 // API Routes
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Get user ID (for first-time users)
 app.get('/api/user-id', (req, res) => {
