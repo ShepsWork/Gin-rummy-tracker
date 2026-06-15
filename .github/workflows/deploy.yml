@@ -115,7 +115,7 @@ services:
       - edge
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.gin-rummy.rule=Host(\\\`gin-rummy.yancmo.xyz\\\`)"
+      - "traefik.http.routers.gin-rummy.rule=Host(`gin-rummy.yancmo.xyz`)"
       - "traefik.http.routers.gin-rummy.entrypoints=websecure"
       - "traefik.http.routers.gin-rummy.tls=true"
       - "traefik.http.routers.gin-rummy.tls.certresolver=cloudflare"
