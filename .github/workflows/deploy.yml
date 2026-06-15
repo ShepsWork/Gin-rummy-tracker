@@ -87,13 +87,14 @@ jobs:
             GHCR_TOKEN="${GHCR_TOKEN}" \
             IMAGE_REPO="${IMAGE_REPO}" \
             IMAGE_TAG="${IMAGE_TAG}" \
-            'bash -s' <<'EOF'
+            bash <<'SSHEOF'
           set -euo pipefail
 
           APP_DIR="/opt/infra-new/apps/gin-rummy-tracker"
           mkdir -p "${APP_DIR}/data"
 
-          cat > "${APP_DIR}/docker-compose.prod.yml" <<COMPOSE
+          # Write docker-compose.prod.yml with Traefik integration
+          cat > "${APP_DIR}/docker-compose.prod.yml" <<'COMPOSE'
 version: '3.8'
 
 networks:
@@ -102,7 +103,6 @@ networks:
 
 services:
   gin-rummy-server:
-    image: ${IMAGE_REPO}:${IMAGE_TAG}
     container_name: gin-rummy-server
     ports:
       - "127.0.0.1:3000:3000"
@@ -123,6 +123,9 @@ services:
     restart: unless-stopped
 COMPOSE
 
+          # Update image reference in compose file
+          sed -i "s|image:.*|image: ${IMAGE_REPO}:${IMAGE_TAG}|" "${APP_DIR}/docker-compose.prod.yml"
+
           cd "${APP_DIR}"
           echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
           docker compose -f docker-compose.prod.yml pull
@@ -132,4 +135,4 @@ COMPOSE
           sleep 2
           curl -fsS http://127.0.0.1:3000/health || exit 1
           echo "✅ Deployment successful - backend is healthy"
-          EOF
+          SSHEOF
