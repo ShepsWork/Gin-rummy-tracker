@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
+const DEFAULT_PLAYER_NAMES = { knocker: 'Player 1', opponent: 'Player 2' };
 
 // Middleware
 app.use(cors());
@@ -16,6 +17,29 @@ app.use(express.json());
 // Data file path
 const dataDir = path.join(__dirname, 'data');
 const getDataFile = (userId) => path.join(dataDir, `${userId}.json`);
+
+const normalizeUserData = (data = {}, fallbackUpdatedAt = 0) => {
+  const games = Array.isArray(data.games) ? data.games : [];
+  const currentGame = Array.isArray(data.currentGame) ? data.currentGame : [];
+
+  const playerNames = data.playerNames && typeof data.playerNames === 'object'
+    ? {
+        knocker: data.playerNames.knocker || DEFAULT_PLAYER_NAMES.knocker,
+        opponent: data.playerNames.opponent || DEFAULT_PLAYER_NAMES.opponent
+      }
+    : { ...DEFAULT_PLAYER_NAMES };
+
+  const parsedUpdatedAt = Number(data.updatedAt);
+  let updatedAt = Number.isFinite(parsedUpdatedAt) && parsedUpdatedAt > 0
+    ? parsedUpdatedAt
+    : fallbackUpdatedAt;
+
+  if ((!updatedAt || updatedAt <= 0) && (games.length > 0 || currentGame.length > 0)) {
+    updatedAt = Date.now();
+  }
+
+  return { games, currentGame, playerNames, updatedAt };
+};
 
 // Ensure data directory exists
 if (!fs.existsSync(dataDir)) {
@@ -34,19 +58,23 @@ const loadUserData = (userId) => {
   const filePath = getDataFile(userId);
   try {
     if (fs.existsSync(filePath)) {
-      return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      const stats = fs.statSync(filePath);
+      const fileUpdatedAt = Number.isFinite(stats.mtimeMs) ? Math.floor(stats.mtimeMs) : 0;
+      return normalizeUserData(parsed, fileUpdatedAt);
     }
   } catch (error) {
     console.error(`Error loading data for user ${userId}:`, error);
   }
-  return { games: [], currentGame: [], playerNames: { knocker: 'Player 1', opponent: 'Player 2' } };
+  return normalizeUserData();
 };
 
 // Save user data
 const saveUserData = (userId, data) => {
   const filePath = getDataFile(userId);
   try {
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+    const normalized = normalizeUserData(data, Date.now());
+    fs.writeFileSync(filePath, JSON.stringify(normalized, null, 2));
   } catch (error) {
     console.error(`Error saving data for user ${userId}:`, error);
     throw error;
@@ -76,15 +104,20 @@ app.get('/api/data', (req, res) => {
 // Save all data for a user
 app.post('/api/data', (req, res) => {
   const userId = getUserId(req);
-  const { games, currentGame, playerNames } = req.body;
+  const { games, currentGame, playerNames, updatedAt } = req.body || {};
 
-  if (typeof games !== 'object' || typeof currentGame !== 'object' || typeof playerNames !== 'object') {
+  if (!Array.isArray(games) || !Array.isArray(currentGame) || !playerNames || typeof playerNames !== 'object') {
     return res.status(400).json({ error: 'Invalid data format' });
   }
 
+  const parsedUpdatedAt = Number(updatedAt);
+  const nextUpdatedAt = Number.isFinite(parsedUpdatedAt) && parsedUpdatedAt > 0
+    ? parsedUpdatedAt
+    : Date.now();
+
   try {
-    saveUserData(userId, { games, currentGame, playerNames });
-    res.json({ success: true, userId });
+    saveUserData(userId, { games, currentGame, playerNames, updatedAt: nextUpdatedAt });
+    res.json({ success: true, userId, updatedAt: nextUpdatedAt });
   } catch (error) {
     res.status(500).json({ error: 'Failed to save data' });
   }
@@ -102,6 +135,7 @@ app.post('/api/games', (req, res) => {
   try {
     const data = loadUserData(userId);
     data.games.push(game);
+    data.updatedAt = Date.now();
     saveUserData(userId, data);
     res.json({ success: true, game });
   } catch (error) {
@@ -117,6 +151,7 @@ app.delete('/api/games/:gameId', (req, res) => {
   try {
     const data = loadUserData(userId);
     data.games = data.games.filter(g => g.id !== gameId);
+    data.updatedAt = Date.now();
     saveUserData(userId, data);
     res.json({ success: true });
   } catch (error) {
@@ -131,6 +166,7 @@ app.delete('/api/games', (req, res) => {
   try {
     const data = loadUserData(userId);
     data.games = [];
+    data.updatedAt = Date.now();
     saveUserData(userId, data);
     res.json({ success: true });
   } catch (error) {

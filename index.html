@@ -678,6 +678,43 @@
             || (Array.isArray(dataCurrentGame) && dataCurrentGame.length > 0);
     }
 
+    function getDataVolume(dataGames, dataCurrentGame) {
+        const currentHands = Array.isArray(dataCurrentGame) ? dataCurrentGame.length : 0;
+        const completedHands = Array.isArray(dataGames)
+            ? dataGames.reduce((sum, game) => sum + ((Array.isArray(game.hands) ? game.hands.length : 0)), 0)
+            : 0;
+        return currentHands + completedHands;
+    }
+
+    function getLatestRecordTimestamp(dataGames, dataCurrentGame) {
+        let latest = 0;
+
+        if (Array.isArray(dataCurrentGame)) {
+            dataCurrentGame.forEach(hand => {
+                const handIdTs = Number(hand && hand.id);
+                if (Number.isFinite(handIdTs) && handIdTs > latest) latest = handIdTs;
+            });
+        }
+
+        if (Array.isArray(dataGames)) {
+            dataGames.forEach(game => {
+                const gameIdTs = Number(game && game.id);
+                if (Number.isFinite(gameIdTs) && gameIdTs > latest) latest = gameIdTs;
+
+                const createdAtTs = Date.parse(game && game.createdAt);
+                if (Number.isFinite(createdAtTs) && createdAtTs > latest) latest = createdAtTs;
+
+                const hands = Array.isArray(game && game.hands) ? game.hands : [];
+                hands.forEach(hand => {
+                    const handIdTs = Number(hand && hand.id);
+                    if (Number.isFinite(handIdTs) && handIdTs > latest) latest = handIdTs;
+                });
+            });
+        }
+
+        return latest;
+    }
+
     function initializeApiUrl() {
         apiUrl = normalizeApiUrl(localStorage.getItem(API_URL_STORAGE_KEY));
     }
@@ -772,13 +809,30 @@
                 const hasServerData = hasAnyData(serverGames, serverCurrentGame);
                 const hasLocalTimestamp = lastUpdatedAt > 0;
 
-                const shouldUseServerData = !hasLocalData || (hasLocalTimestamp && serverUpdatedAt > lastUpdatedAt);
+                const hasServerTimestamp = serverUpdatedAt > 0;
+                const localVolume = getDataVolume(games, currentGame);
+                const serverVolume = getDataVolume(serverGames, serverCurrentGame);
+                const localLatestRecord = getLatestRecordTimestamp(games, currentGame);
+                const serverLatestRecord = getLatestRecordTimestamp(serverGames, serverCurrentGame);
+
+                const shouldUseServerData = !hasLocalData
+                    || (hasServerTimestamp && (!hasLocalTimestamp || serverUpdatedAt > lastUpdatedAt))
+                    || (!hasServerTimestamp && hasServerData && (
+                        serverVolume > localVolume
+                        || (serverVolume === localVolume && serverLatestRecord > localLatestRecord)
+                    ));
 
                 if (shouldUseServerData) {
                     games = serverGames;
                     currentGame = serverCurrentGame;
                     playerNames = serverPlayerNames;
-                    saveDataToLocal(serverUpdatedAt > 0 ? serverUpdatedAt : Date.now());
+                    const normalizedUpdatedAt = serverUpdatedAt > 0 ? serverUpdatedAt : Date.now();
+                    saveDataToLocal(normalizedUpdatedAt);
+
+                    // Backfill updatedAt for legacy server payloads so subsequent sync decisions are stable.
+                    if (!hasServerTimestamp && hasServerData) {
+                        await saveDataToServer(normalizedUpdatedAt);
+                    }
                 } else if (hasLocalData && !hasServerData) {
                     console.info('Server returned no game data; uploading local data to restore sync.');
                     await saveDataToServer();
@@ -931,6 +985,8 @@
             if (diff > 0) {
                 knockerScore = diff;
                 notes.push(`Knock: ${opponentDW} - ${knockerDW} = ${diff}`);
+            } else if (knockerDW === 0 && opponentDW === 0) {
+                notes.push('Knock scored no points (both deadwood are 0). Use Gin or Big Gin for bonus scoring.');
             } else {
                 notes.push('Knock scored no points');
             }
