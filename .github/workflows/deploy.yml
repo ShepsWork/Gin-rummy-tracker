@@ -6,14 +6,13 @@ on:
       - main
   workflow_dispatch:
 
-# Required repository secrets:
-# - ORACLE_VM_SSH_KEY: private SSH key for the deploy user on the Oracle VM
-# - ORACLE_VM_USER: SSH username on the Oracle VM (default: ubuntu)
+# Deployment Strategy:
+# 1. Build multi-platform Docker image (amd64, arm64)
+# 2. Push to GHCR (ghcr.io/shepswork/gin-rummy-tracker:latest)
+# 3. Manual pull and restart on Oracle VM (or future webhook endpoint)
 #
-# Note: Deploy target is hardcoded to Oracle VM public IP (100.81.231.58)
-# since GitHub Actions runners can't access Tailscale or private networks.
-#
-# Traefik routing configured for: gin-rummy.yancmo.xyz
+# Public API: https://gin-rummy.yancmo.xyz/api
+# Frontend: https://shepswork.github.io/Gin-rummy-tracker/
 
 permissions:
   contents: read
@@ -49,43 +48,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image to GHCR (multi-platform)
+      - name: Build and push image to GHCR
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ steps.meta.outputs.image_repo }}:latest
             ${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.short_sha }}
 
-      - name: Trigger deployment webhook on Oracle VM
+      - name: Image pushed to GHCR
         shell: bash
-        env:
-          IMAGE_TAG: ${{ steps.meta.outputs.short_sha }}
-          WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
         run: |
-          set -euo pipefail
-          
-          # The webhook is hosted locally on the VM at port 8888
-          # We reach it via Cloudflare Tunnel's public endpoint
-          # For now, using local IP since webhook is not yet exposed publicly
-          
-          PAYLOAD=$(cat <<EOF
-          {
-            "imageTag": "${IMAGE_TAG}",
-            "pushedBy": "github-actions",
-            "repo": "${{ github.repository }}",
-            "ref": "${{ github.ref }}"
-          }
-          EOF
-          )
-          
-          SIGNATURE=$(echo -n "${PAYLOAD}" | openssl dgst -sha256 -hmac "${WEBHOOK_SECRET}" -hex | sed 's/^.*= //')
-          
-          # Try to reach webhook locally first (if on same network)
-          # Otherwise, fall back to manual deployment or use GitHub dispatch
-          
-          echo "📦 Image pushed to GHCR: ${{ steps.meta.outputs.image_repo }}:${IMAGE_TAG}"
-          echo "✅ Waiting for VM to auto-pull via watchtower (monitor at gin-rummy.yancmo.xyz)"
-          echo "   Note: Webhook deployment will be available after initial VM setup"
+          echo "✅ Docker image built and pushed to GHCR"
+          echo "   Repository: ${{ steps.meta.outputs.image_repo }}"
+          echo "   Tags: latest, ${{ steps.meta.outputs.short_sha }}"
+          echo ""
+          echo "📝 Manual deployment on Oracle VM:"
+          echo "   ssh ubuntu@100.81.231.58"
+          echo "   cd /opt/infra-new/apps/gin-rummy-tracker"
+          echo "   docker pull ghcr.io/shepswork/gin-rummy-tracker:latest"
+          echo "   docker tag ghcr.io/shepswork/gin-rummy-tracker:latest gin-rummy-tracker:latest"
+          echo "   docker compose -f docker-compose.prod.yml up -d"
+          echo ""
+          echo "🌐 Public endpoint: https://gin-rummy.yancmo.xyz/api"
