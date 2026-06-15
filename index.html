@@ -1120,9 +1120,10 @@
         let totalHands = 0;
 
         games.forEach(game => {
-            totalHands += game.hands.length;
+            const hands = game.hands || [];
+            totalHands += hands.length;
 
-            const totals = getGameTotals(game.hands);
+            const totals = getGameTotals(hands);
             const winner = getWinnerFromTotals(totals);
 
             if (winner) {
@@ -1256,7 +1257,8 @@
         let gamesHtml = '';
 
         [...games].reverse().forEach((game, idx) => {
-            const totals = getGameTotals(game.hands);
+            const hands = game.hands || [];
+            const totals = getGameTotals(hands);
             const winner = getWinnerFromTotals(totals);
 
             let scoresHtml = '';
@@ -1278,7 +1280,7 @@
                         <div>Game ${games.length - idx}</div>
                         <div class="game-header-right">
                             ${formatDate(game.createdAt)}<br>
-                            ${game.hands.length} hands
+                            ${hands.length} hands
                         </div>
                     </div>
                     <div class="game-scores">${scoresHtml}</div>
